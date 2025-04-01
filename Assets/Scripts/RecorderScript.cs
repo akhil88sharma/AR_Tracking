@@ -2,6 +2,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Android;
+using System.IO;
+using System;
 
 public class RecorderScript : MonoBehaviour
 {
@@ -9,13 +11,16 @@ public class RecorderScript : MonoBehaviour
     public TextMeshProUGUI statusText;
 
     private bool isRecording = false;
-    private NativeCamera.Permission cameraPermission;
     private string recordedVideoPath;
 
     void Start()
     {
+        recordButton.gameObject.SetActive(true);
         recordButton.onClick.AddListener(ToggleRecording);
         statusText.text = "Start Recording";
+        
+        if (!Permission.HasUserAuthorizedPermission(Permission.ExternalStorageWrite))
+            Permission.RequestUserPermission(Permission.ExternalStorageWrite);
     }
 
     void ToggleRecording()
@@ -32,21 +37,37 @@ public class RecorderScript : MonoBehaviour
 
     void StartRecording()
     {
+        string customPath = Path.Combine(Application.persistentDataPath, "MyVideos");
+        if (!Directory.Exists(customPath))
+        {
+            Directory.CreateDirectory(customPath);
+        }
+        string savePath = Path.Combine(customPath, "video_" + System.DateTime.Now.ToString("yyyyMMddHHmmss") + ".mp4");
+
         var permission = NativeCamera.CheckPermission(true);
 
-        if (!Permission.HasUserAuthorizedPermission(Permission.ExternalStorageWrite))
-            Permission.RequestUserPermission(Permission.ExternalStorageWrite);
         if (permission == NativeCamera.Permission.Granted)
         {
             // For recording device camera (not AR content)
             NativeCamera.RecordVideo((path) =>
             {
-                recordedVideoPath = path;
                 statusText.text = $"Video saved!"+ path;
                 isRecording = false;
-                recordButton.GetComponentInChildren<Text>().text = "Start Recording";
+                if (path != savePath)
+                {
+                    if (File.Exists(savePath))
+                    {
+                        File.Delete(savePath);
+                    }
+                    
+                    File.Move(path, savePath);
+                    path = savePath;
+
+                    SaveToGallery(savePath);
+                }
+                recordedVideoPath = path;
             },
-            NativeCamera.Quality.High,
+            NativeCamera.Quality.Low,
             maxDuration: 0);
 
             isRecording = true;
@@ -63,11 +84,46 @@ public class RecorderScript : MonoBehaviour
         }
     }
 
+    private void SaveToGallery(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        // Use Native Gallery to save to gallery
+        string albumName = "MyARVideos";
+        string galleryFileName = "AR_Recording_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".mp4";
+
+        NativeGallery.Permission permission = NativeGallery.SaveVideoToGallery(
+            path,
+            albumName,
+            galleryFileName,
+            (success, newPath) =>
+            {
+                if (success)
+                    statusText.text = "Video saved!";
+            }
+        );
+
+        // Check the permission result
+        switch (permission)
+        {
+            case NativeGallery.Permission.Granted:
+                break;
+            case NativeGallery.Permission.Denied:
+                statusText.text = "Permission denied to save video to gallery";
+                break;
+            case NativeGallery.Permission.ShouldAsk:
+                break;
+        }
+    }
+
     void StopRecording()
     {
         
         isRecording = false;
-        statusText.text = "Ready to record";
+        statusText.text = "Start Recording";
     }
 
     // Optional: Preview the recorded video

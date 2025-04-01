@@ -14,13 +14,13 @@ public class TestScript : MonoBehaviour
     private ARRaycastManager raycastManager;
 
     public TextMeshProUGUI header;
-    public TextMeshProUGUI logStats;
     public GameObject virtualObject;
+    public GameObject recorder;
 
-    public float detectionThreshold = 0.3f;  // Adjusted for long-range detection
-    public float maxDetectionDistance = 25f; // Increased to detect distant objects
-    public float raycastDistance = 30f;      // Longer raycast distance
-    public Transform arCamera;               // Reference to AR Camera
+    public float detectionThreshold = 0.3f;
+    public float maxDetectionDistance = 25f;
+    public float raycastDistance = 30f;
+    public Transform arCamera;
 
     private List<Vector3> detectedFeaturePoints = new List<Vector3>();
     private ARAnchor anchor;
@@ -28,7 +28,6 @@ public class TestScript : MonoBehaviour
     void Start()
     {
         header.text = "Place Stumps at the marked location";
-        logStats.text = "";
 
         if (xrOrigin != null)
         {
@@ -40,15 +39,11 @@ public class TestScript : MonoBehaviour
 
         if (virtualObject == null)
         {
-            Debug.LogError("Virtual Object not assigned!");
-            logStats.text = "Virtual Object not assigned";
             return;
         }
 
         if (pointCloudManager == null || planeManager == null || anchorManager == null || raycastManager == null)
         {
-            Debug.LogError("Missing AR Managers!");
-            logStats.text = "Missing AR Managers";
             return;
         }
 
@@ -64,12 +59,12 @@ public class TestScript : MonoBehaviour
 
         if (isObjectPlacedCorrectly)
         {
-            Debug.Log("Real object detected at the correct position!");
             header.text = "Stumps Aligned!";
+            recorder.gameObject.SetActive(true);
         }
         else
         {
-            header.text = "Align Stumps Properly";
+            header.text = "Align the stumps!";
         }
     }
 
@@ -101,7 +96,7 @@ public class TestScript : MonoBehaviour
                 foreach (Vector3 point in pointCloud.positions.Value)
                 {
                     float distanceToCamera = Vector3.Distance(arCamera.position, point);
-                    if (distanceToCamera < maxDetectionDistance) // Only store points within the max range
+                    if (distanceToCamera < maxDetectionDistance)
                     {
                         detectedFeaturePoints.Add(point);
                     }
@@ -117,7 +112,6 @@ public class TestScript : MonoBehaviour
             float distance = Vector3.Distance(realPoint, virtualPos);
             if (distance < detectionThreshold)
             {
-                logStats.text = "Positions aligned!";
                 return true;
             }
         }
@@ -131,16 +125,12 @@ public class TestScript : MonoBehaviour
         Vector3 direction = virtualPos - arCamera.position;
         if (Physics.Raycast(arCamera.position, direction.normalized, out hit, raycastDistance))
         {
-            Debug.Log("Real object detected using Camera Raycast: " + hit.collider.gameObject.name);
-            logStats.text = "Detected using Camera Raycast: " + hit.collider.gameObject.name;
             return true;
         }
 
         // Downward Raycast for better accuracy
         if (Physics.Raycast(virtualPos + Vector3.up * 1.0f, Vector3.down, out hit, raycastDistance))
         {
-            Debug.Log("Real object detected using Downward Raycast: " + hit.collider.gameObject.name);
-            logStats.text = "Detected using Downward Raycast: " + hit.collider.gameObject.name;
             return true;
         }
 
